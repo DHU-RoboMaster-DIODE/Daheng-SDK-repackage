@@ -28,20 +28,27 @@ struct Imagedata {//这个数据结构可以考虑换成队列
 
 video::video()
 {
+#ifndef Release
 	try {
+#endif
 		IGXFactory::GetInstance().Init();
+#ifndef Release
 	}
 	catch (CGalaxyException& e) {
 		cout << "错误码: " << e.GetErrorCode() << endl;
 		cout << "错误描述信息: " << e.what() << endl;
 	}
+#endif
 }
 
 video::~video()
 {
+#ifndef Release
 	//关闭设备之后，不能再调用其他任何库接口
 	try {
+#endif
 		IGXFactory::GetInstance().Uninit();
+#ifndef Release
 	}
 	catch (CGalaxyException& e) {
 		cout << "错误码: " << e.GetErrorCode() << endl;
@@ -51,6 +58,7 @@ video::~video()
 		delete pCaptureEventHandler;
 		pCaptureEventHandler = NULL;
 	}
+#endif
 }
 
 void video::initParam(int n)
@@ -111,7 +119,9 @@ bool video::videoOpen(int n) {//初始化相机
 	bool bIsDeviceOpen = false;       ///< 设备是否已打开标志
 	bool bIsStreamOpen = false;       ///< 设备流是否已打开标志
 	bool m_bSupportExposureEndEvent = false;       ///< 是否支持曝光结束标志
+#ifndef Release
 	try {
+#endif
 		cerr << vectorDeviceInfo[n].GetSN() << endl;
 		m_objDevicePtr[n] = IGXFactory::GetInstance().OpenDeviceBySN(vectorDeviceInfo[n].GetSN(), GX_ACCESS_EXCLUSIVE);//打开设备
 		bIsDeviceOpen = true;
@@ -129,6 +139,7 @@ bool video::videoOpen(int n) {//初始化相机
 		//初始化相机参数
 		initParam(n);
 		m_bIsOpen[n] = true;
+#ifndef Release
 	}
 	catch (CGalaxyException& e) {
 
@@ -150,6 +161,7 @@ bool video::videoOpen(int n) {//初始化相机
 		}
 		return false;
 	}
+#endif
 	return true;
 }
 
@@ -194,7 +206,9 @@ void video::videoClose(int n) {//断开相机
 
 bool video::setTrigMode(int mode,int n)
 {
+#ifndef Release
 	try {
+#endif
 		m_bTriggerMode[n] = m_objFeatureControlPtr[n]->IsImplemented("TriggerMode");//是否支持触发模式选择
 		if (m_bTriggerMode[n]) {
 			m_objFeatureControlPtr[n]->GetEnumFeature("TriggerMode")->SetValue("Off");//设置触发模式关
@@ -210,6 +224,7 @@ bool video::setTrigMode(int mode,int n)
 			}
 		}
 		return true;
+#ifndef Release
 	}
 	catch (CGalaxyException& e) {
 		cerr << e.what() << endl;
@@ -219,13 +234,17 @@ bool video::setTrigMode(int mode,int n)
 		cerr << e.what() << endl;
 		return false;
 	}
+#endif
 	return false;
 }
 
 void video::executeSoftTrig() {
+#ifndef Release
 	try {//发送软触发命令(在触发模式开启时有效)
+#endif
 		for(int i=0;i<deviceNum;++i)
 			m_objFeatureControlPtr[i]->GetCommandFeature("TriggerSoftware")->Execute();
+#ifndef Release
 	}
 	catch (CGalaxyException& e) {
 		cout << e.what() << endl;
@@ -235,6 +254,7 @@ void video::executeSoftTrig() {
 		cout << e.what() << endl;
 		return;
 	}
+#endif
 }
 
 void video::SetExposeTime(double m_dEditShutterValue,int n) {//设置曝光
@@ -243,8 +263,9 @@ void video::SetExposeTime(double m_dEditShutterValue,int n) {//设置曝光
 		return;
 	}
 	double dShutterValueOld = m_dEditShutterValue;
+#ifndef Release
 	try {//判断输入值是否在曝光时间范围内，如果不是则设置与其最近的边界值
-	
+#endif
 		if (m_dEditShutterValue > m_dShutterValueMax[n]) {
 			m_dEditShutterValue = m_dShutterValueMax[n];
 		}
@@ -252,6 +273,7 @@ void video::SetExposeTime(double m_dEditShutterValue,int n) {//设置曝光
 			m_dEditShutterValue = m_dShutterValueMin[n];
 		}
 		m_objFeatureControlPtr[n]->GetFloatFeature("ExposureTime")->SetValue(m_dEditShutterValue);
+#ifndef Release
 	}
 	catch (CGalaxyException & e)
 	{
@@ -263,21 +285,31 @@ void video::SetExposeTime(double m_dEditShutterValue,int n) {//设置曝光
 		m_dEditShutterValue = dShutterValueOld;
 		cerr << e.what() << endl;
 	}
+#endif
 }							
 void video::SetAdjustPlus(double m_dEditGainValue,int n) {//设置增益
 	if (!m_bIsOpen){
 		return;
 	}
 	double dGainValueOld = m_dEditGainValue;
+#ifndef Release
 	try{
-		//判断输入值是否在增益值范围内，如果不是则设置与其最近的边界值
-		if (m_dEditGainValue > m_dGainValueMax[n]){
-			m_dEditGainValue = m_dGainValueMax[n];
+#endif
+		if (m_dEditGainValue == -1) {
+			m_objFeatureControlPtr[n]->GetEnumFeature("GainAuto")->SetValue("Continuous");
 		}
-		if (m_dEditGainValue < m_dGainValueMin[n]){
-			m_dEditGainValue = m_dGainValueMin[n];
+		else {
+			m_objFeatureControlPtr[n]->GetEnumFeature("GainAuto")->SetValue("Off");
+			//判断输入值是否在增益值范围内，如果不是则设置与其最近的边界值
+			if (m_dEditGainValue > m_dGainValueMax[n]) {
+				m_dEditGainValue = m_dGainValueMax[n];
+			}
+			if (m_dEditGainValue < m_dGainValueMin[n]) {
+				m_dEditGainValue = m_dGainValueMin[n];
+			}
+			m_objFeatureControlPtr[n]->GetFloatFeature("Gain")->SetValue(m_dEditGainValue);
 		}
-		m_objFeatureControlPtr[n]->GetFloatFeature("Gain")->SetValue(m_dEditGainValue);
+#ifndef Release
 	}
 	catch (CGalaxyException & e){
 		m_dEditGainValue = dGainValueOld;
@@ -285,21 +317,31 @@ void video::SetAdjustPlus(double m_dEditGainValue,int n) {//设置增益
 	catch (std::exception & e){
 		m_dEditGainValue = dGainValueOld;
 	}
+#endif
 }
 void video::setBalanceRatio(double m_dEditBalanceRatioValue,int n) {
 	if (!m_bIsOpen[n]){
 		return;
 	}
 	double dBalanceWhiteRatioOld = m_dEditBalanceRatioValue;
+#ifndef Release
 	try{
-		//判断输入值是否在自动白平衡系数范围内，如果不是则设置与其最近的边界值
-		if (m_dEditBalanceRatioValue > m_dBalanceWhiteRatioMax[n]){
-			m_dEditBalanceRatioValue = m_dBalanceWhiteRatioMax[n];
+#endif
+		if (m_dEditBalanceRatioValue == -1) { //自动白平衡
+			m_objFeatureControlPtr[n]->GetEnumFeature("BalanceWhiteAuto")->SetValue("Continuous");
 		}
-		if ((m_dEditBalanceRatioValue < m_dBalanceWhiteRatioMin[n])){
-			m_dEditBalanceRatioValue = m_dBalanceWhiteRatioMin[n];
+		else {
+			m_objFeatureControlPtr[n]->GetEnumFeature("BalanceWhiteAuto")->SetValue("Off");
+			//判断输入值是否在自动白平衡系数范围内，如果不是则设置与其最近的边界值
+			if (m_dEditBalanceRatioValue > m_dBalanceWhiteRatioMax[n]) {
+				m_dEditBalanceRatioValue = m_dBalanceWhiteRatioMax[n];
+			}
+			if ((m_dEditBalanceRatioValue < m_dBalanceWhiteRatioMin[n])) {
+				m_dEditBalanceRatioValue = m_dBalanceWhiteRatioMin[n];
+			}
+			m_objFeatureControlPtr[n]->GetFloatFeature("BalanceRatio")->SetValue(m_dEditBalanceRatioValue);
 		}
-		m_objFeatureControlPtr[n]->GetFloatFeature("BalanceRatio")->SetValue(m_dEditBalanceRatioValue);
+#ifndef Release
 	}
 	catch (CGalaxyException & e){
 		m_dEditBalanceRatioValue = dBalanceWhiteRatioOld;
@@ -309,12 +351,15 @@ void video::setBalanceRatio(double m_dEditBalanceRatioValue,int n) {
 		m_dEditBalanceRatioValue = dBalanceWhiteRatioOld;
 		cout << e.what() << endl;
 	}
+#endif
 }
 void video::setROI(int64_t nX, int64_t nY, int64_t nWidth, int64_t nHeight, int n){
 	if (!m_bIsOpen[n]) {
 		return;
 	}
+#ifndef Release
 	try {
+#endif
 		if (nWidth > m_nWidthMax[n]) { nWidth = m_nWidthMax[n]; }
 		if (nHeight > m_nHeightMax[n]) { nHeight = m_nHeightMax[n]; }
 		if (nWidth + nX > m_nWidthMax[n]) { //偏移量超出最大值
@@ -329,7 +374,7 @@ void video::setROI(int64_t nX, int64_t nY, int64_t nWidth, int64_t nHeight, int 
 		m_objFeatureControlPtr[n]->GetIntFeature("OffsetY")->SetValue(nY);
 		m_objFeatureControlPtr[n]->GetIntFeature("Width")->SetValue(nWidth);
 		m_objFeatureControlPtr[n]->GetIntFeature("Height")->SetValue(nHeight);
-		
+#ifndef Release
 	}
 	catch (CGalaxyException& e) {
 		cout << e.what() << endl;
@@ -337,14 +382,18 @@ void video::setROI(int64_t nX, int64_t nY, int64_t nWidth, int64_t nHeight, int 
 	catch (std::exception& e) {
 		cout << e.what() << endl;
 	}
+#endif
 }
 
 void video::setFrameRate(double rate, int n) {
 	if (!m_bIsOpen[n]) {
 		return;
 	}
+#ifndef Release
 	try {
+#endif
 		m_objFeatureControlPtr[n]->GetFloatFeature("AcquisitionFrameRate")->SetValue(rate);
+#ifndef Release
 	}
 	catch (CGalaxyException& e) {
 		cout << e.what() << endl;
@@ -352,6 +401,7 @@ void video::setFrameRate(double rate, int n) {
 	catch (std::exception& e) {
 		cout << e.what() << endl;
 	}
+#endif
 }		
 
 CSampleCaptureEventHandler::CSampleCaptureEventHandler(int n1) {

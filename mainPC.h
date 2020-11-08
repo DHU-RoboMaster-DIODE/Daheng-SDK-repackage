@@ -9,5 +9,10 @@ public:
 	void ImageConsumer();
 private:
 	video a;
+	int ROI[4];
+	int ExposeTime;
+	double AdjustPlus;
+	double BalanceRatio;
+	double FrameRate;
 };
 

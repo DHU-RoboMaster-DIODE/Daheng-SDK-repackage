@@ -1,14 +1,22 @@
 #include "mainPC.h"
 #include "video.h"
 
+using cv::FileStorage;
 mainPC::mainPC(int* setting)
 {
-    
+    FileStorage storage("setting.xml", FileStorage::READ);
+    ROI[0] = storage["OffSetX"].real();
+    ROI[1] = storage["OffSetY"].real();
+    ROI[2] = storage["Width"].real();
+    ROI[3] = storage["Height"].real();
+    ExposeTime = storage["ExposeTime"].real();
+    AdjustPlus = storage["AdjustPlus"].real();
+    BalanceRatio = storage["BalanceRatio"].real();
+    FrameRate = storage["FrameRate"].real();
 }
 
 void mainPC::ImageProducer()
 {
-    
     if (!a.videoCheck()) {
         cerr << "没相机\n";
     }
@@ -24,13 +32,13 @@ void mainPC::ImageProducer()
     }
     else {//一个相机就普普通通连续拉流
         if (a.videoOpen()) {
-            a.setROI(0, 0, 1280, 1024);//最大图像宽高(偏移量必须为16的倍数)
+            a.setROI(ROI[0], ROI[1], ROI[2], ROI[3]);
             a.videoStart();
             a.setTrigMode();
-            a.SetAdjustPlus(3.0000);
-            a.setBalanceRatio(1.3086);
-            a.setFrameRate(99.4000);//最大帧率
-            a.SetExposeTime(10000);
+            a.SetAdjustPlus(AdjustPlus);
+            a.setBalanceRatio(BalanceRatio);
+            a.setFrameRate(FrameRate);//最大帧率
+            a.SetExposeTime(ExposeTime);
         }
     }
     
