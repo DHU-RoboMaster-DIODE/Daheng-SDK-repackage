@@ -1,3 +1,17 @@
 
 .vs/Video/v16/.suo
 *.db
+*.opendb
+*.ipch
+*.obj
+*.idb
+*.pdb
+*.exe
+*.ilk
+*.log
+*.tlog
+*.txt
+LICENSE
+*.vcxproj
+*.filters
+*.user
