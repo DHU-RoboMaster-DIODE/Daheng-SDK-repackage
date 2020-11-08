@@ -24,8 +24,12 @@ void mainPC::ImageProducer()
     }
     else {//一个相机就普普通通连续拉流
         if (a.videoOpen()) {
+            a.setROI(0, 0, 1280, 1024);//最大图像宽高(偏移量必须为16的倍数)
             a.videoStart();
             a.setTrigMode();
+            a.SetAdjustPlus(3.0000);
+            a.setBalanceRatio(1.3086);
+            a.setFrameRate(99.4000);//最大帧率
             a.SetExposeTime(10000);
         }
     }
@@ -44,7 +48,7 @@ void mainPC::ImageConsumer()
             }
             else {
                 imshow(winname[i], src);
-                waitKey(0);
+                waitKey(1);
             }
         }
     }

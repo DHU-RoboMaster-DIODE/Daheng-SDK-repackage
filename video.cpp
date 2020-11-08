@@ -77,20 +77,24 @@ void video::initParam(int n)
 
 	m_bBalanceWhiteRatioSelect[n] = m_objFeatureControlPtr[n]->IsImplemented("BalanceRatioSelector");//是否支持自动白平衡通道选择
 
-	//获取曝光时间、增益及自动白平衡系数的最大值和最小值
+	//获取曝光时间、增益、自动白平衡系数及图像宽高的最大值和最小值
 	m_dShutterValueMax[n] = m_objFeatureControlPtr[n]->GetFloatFeature("ExposureTime")->GetMax();
 	m_dShutterValueMin[n] = m_objFeatureControlPtr[n]->GetFloatFeature("ExposureTime")->GetMin();
 	m_dGainValueMax[n] = m_objFeatureControlPtr[n]->GetFloatFeature("Gain")->GetMax();
 	m_dGainValueMin[n] = m_objFeatureControlPtr[n]->GetFloatFeature("Gain")->GetMin();
 	m_dBalanceWhiteRatioMax[n] = m_objFeatureControlPtr[n]->GetFloatFeature("BalanceRatio")->GetMax();
 	m_dBalanceWhiteRatioMin[n] = m_objFeatureControlPtr[n]->GetFloatFeature("BalanceRatio")->GetMin();
+	m_nWidthMax[n] = m_objFeatureControlPtr[n]->GetIntFeature("WidthMax")->GetValue();
+	m_nHeightMax[n] = m_objFeatureControlPtr[n]->GetIntFeature("HeightMax")->GetValue();
 #ifndef Release
 	cout << "m_dShutterValueMax:" << m_dShutterValueMax[n] << endl
 		<< "m_dShutterValueMin:" << m_dShutterValueMin[n] << endl
 		<< "m_dGainValueMax:" << m_dGainValueMax[n] << endl
 		<< "m_dGainValueMin:" << m_dGainValueMin[n] << endl
 		<< "m_dBalanceWhiteRatioMax:" << m_dBalanceWhiteRatioMax[n] << endl
-		<< "m_dBalanceWhiteRatioMin:" << m_dBalanceWhiteRatioMin[n] << endl;
+		<< "m_dBalanceWhiteRatioMin:" << m_dBalanceWhiteRatioMin[n] << endl
+		<< "m_nWidthMax:" << m_nWidthMax[n] << endl
+		<< "m_nHeightMax:" << m_nHeightMax[n] << endl;
 #endif // !DEBUG
 
 }
@@ -282,7 +286,6 @@ void video::SetAdjustPlus(double m_dEditGainValue,int n) {//设置增益
 		m_dEditGainValue = dGainValueOld;
 	}
 }
-void video::setBufferSize(int nSize) {}
 void video::setBalanceRatio(double m_dEditBalanceRatioValue,int n) {
 	if (!m_bIsOpen[n]){
 		return;
@@ -307,22 +310,48 @@ void video::setBalanceRatio(double m_dEditBalanceRatioValue,int n) {
 		cout << e.what() << endl;
 	}
 }
-void video::setResolution(int height, int width) {
-
-} 
-void video::setROI(int64_t nX, int64_t nY, int64_t nWidth, int64_t nHeight){
-
+void video::setROI(int64_t nX, int64_t nY, int64_t nWidth, int64_t nHeight, int n){
+	if (!m_bIsOpen[n]) {
+		return;
+	}
+	try {
+		if (nWidth > m_nWidthMax[n]) { nWidth = m_nWidthMax[n]; }
+		if (nHeight > m_nHeightMax[n]) { nHeight = m_nHeightMax[n]; }
+		if (nWidth + nX > m_nWidthMax[n]) { //偏移量超出最大值
+			nX = m_nWidthMax[n] - nWidth;
+			nX = nX - nX % 16;
+		}
+		if (nHeight + nY > m_nHeightMax[n]) {
+			nY = m_nHeightMax[n] - nHeight;
+			nY = nY - nY % 16;
+		}
+		m_objFeatureControlPtr[n]->GetIntFeature("OffsetX")->SetValue(nX);
+		m_objFeatureControlPtr[n]->GetIntFeature("OffsetY")->SetValue(nY);
+		m_objFeatureControlPtr[n]->GetIntFeature("Width")->SetValue(nWidth);
+		m_objFeatureControlPtr[n]->GetIntFeature("Height")->SetValue(nHeight);
+		
+	}
+	catch (CGalaxyException& e) {
+		cout << e.what() << endl;
+	}
+	catch (std::exception& e) {
+		cout << e.what() << endl;
+	}
 }
-void video::setBinning(){
 
-}
-bool video::loadSetting(int mode){
-
-	return true;
-}
-
-void video::setFrameRate(double rate) {
-
+void video::setFrameRate(double rate, int n) {
+	if (!m_bIsOpen[n]) {
+		return;
+	}
+	try {
+		m_objFeatureControlPtr[n]->GetFloatFeature("AcquisitionFrameRate")->SetValue(rate);
+	}
+	catch (CGalaxyException& e) {
+		cout << e.what() << endl;
+	}
+	catch (std::exception& e) {
+		cout << e.what() << endl;
+	}
 }		
 
 CSampleCaptureEventHandler::CSampleCaptureEventHandler(int n1) {

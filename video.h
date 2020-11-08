@@ -46,15 +46,11 @@ public:
     void executeSoftTrig();									            //执行一次软触发Done       
     void SetExposeTime(double m_dEditShutterValue,int n=0);				//设置曝光Done
     void SetAdjustPlus(double m_dEditGainValue,int n=0);				//设置增益Done
-    void setBufferSize(int nSize);                                      //SJR:不是我写的
-    void setBalanceRatio(double m_dEditBalanceRatioValue,int n=0);      //SJR:没测试
-    void setResolution(int height = 720, int width = 1280);             //SJR:不是我写的
-    void setROI(int64_t nX, int64_t nY, int64_t nWidth, int64_t nHeight);//SJR:不是我写的
-    void setBinning();                                                  //SJR:不是我写的
-    bool loadSetting(int mode);                                         //SJR:不是我写的
+    void setBalanceRatio(double m_dEditBalanceRatioValue,int n=0);      //白平衡Done
+    void setROI(int64_t nX, int64_t nY, int64_t nWidth, int64_t nHeight,int n=0);
+                                                                        //设置ROI(区域输出)DONE
 
-
-    void setFrameRate(double rate = 210);					            //设置帧率//SJR:不是我写的
+    void setFrameRate(double rate = 210,int n=0);					    //设置帧率Done
     int  deviceNum = 0;                                                 //相机个数
 
 private:
@@ -87,6 +83,8 @@ private:
     double                            m_dGainValueMin[2];            // 增益最小值
     double                            m_dBalanceWhiteRatioMax[2];    // 自动白平衡系数最大值
     double                            m_dBalanceWhiteRatioMin[2];    // 自动白平衡系数最小值
+    int                               m_nWidthMax[2];                // 图像宽度最大值
+    int                               m_nHeightMax[2];               // 图像高度最大值
     int                               m_nTriggerModeOld[2];          // 记录触发模式
     int                               m_nTriggerSourceOld[2];        // 记录触发源
     int                               m_nTriggerActiveOld[2];        // 记录触发极性
