@@ -54,11 +54,11 @@ video::~video()
 		cout << "错误码: " << e.GetErrorCode() << endl;
 		cout << "错误描述信息: " << e.what() << endl;
 	}
+#endif
 	if (NULL != pCaptureEventHandler) {//销毁事件回调指针
 		delete pCaptureEventHandler;
 		pCaptureEventHandler = NULL;
 	}
-#endif
 }
 
 void video::initParam(int n)
@@ -134,7 +134,11 @@ bool video::videoOpen(int n) {//初始化相机
 			bIsStreamOpen = true;
 		}
 		else {
+#ifndef Release
 			throw exception("未发现设备流!");
+#else
+			return false;
+#endif
 		}
 		//初始化相机参数
 		initParam(n);
