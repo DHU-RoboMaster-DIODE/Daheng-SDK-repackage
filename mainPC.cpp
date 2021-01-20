@@ -1,7 +1,9 @@
 #include "mainPC.h"
 #include "video.h"
 
-using cv::FileStorage;
+using namespace std;
+using namespace cv;
+
 mainPC::mainPC(int* setting)
 {
     FileStorage storage("setting.xml", FileStorage::READ);
@@ -18,46 +20,26 @@ mainPC::mainPC(int* setting)
 void mainPC::ImageProducer()
 {
     if (!a.videoCheck()) {
-        cerr << "没相机\n";
+        cerr << "娌＄浉鏈篭n";
     }
-    if (a.deviceNum >= 2) {//有两个相机的话，就用软触发连续抓同一时刻的图
-        for (int i = 0; i < a.deviceNum; ++i) {
-            if (a.videoOpen(i)) {
-                a.setTrigMode(1, i);
-                a.videoStart(i);
-                a.executeSoftTrig();
-                a.SetExposeTime(10000);
-            }
-        }
+    if (a.videoOpen()) {
+        a.streamControl(1);
+        cerr << "ok\n";
     }
-    else {//一个相机就普普通通连续拉流
-        if (a.videoOpen()) {
-            a.setROI(ROI[0], ROI[1], ROI[2], ROI[3]);
-            a.videoStart();
-            a.setTrigMode();
-            a.SetAdjustPlus(AdjustPlus);
-            a.setBalanceRatio(BalanceRatio);
-            a.setFrameRate(FrameRate);//最大帧率
-            a.SetExposeTime(ExposeTime);
-        }
-    }
-    
 }
 
 void mainPC::ImageConsumer()
 {
     Mat src;
-    int i = 0;
     while (1) {
-        string winname[2] = { "1","2" };
-        for (int i = 0; i < a.deviceNum; ++i) {
-            if (!a.getFrame(src, i)) {
-                break;
-            }
-            else {
-                imshow(winname[i], src);
-                waitKey(1);
-            }
+        if (!a.getFrame(src)) {
+            cerr << "娌n";
+        }
+        else {
+            cerr << "2\n";
+            //imshow("0", src);
+            waitKey(1);
         }
     }
+    cerr<<"out"<<endl;
 }

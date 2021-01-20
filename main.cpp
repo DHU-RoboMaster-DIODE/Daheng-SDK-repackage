@@ -1,10 +1,9 @@
 #include <thread>
-
 #include "mainPC.h"
 
 int main()
 {
-    int setting;//ÏÈËæ±ãĞ´¸öint£¬Ö®ºóÓ¦¸Ã¸ÄÎª×¨ÃÅµÄÅäÖÃÀà
+    int setting;//å…ˆéšä¾¿å†™ä¸ªintï¼Œä¹‹ååº”è¯¥æ”¹ä¸ºä¸“é—¨çš„é…ç½®ç±»
     mainPC image_cons_prod(&setting);
 
     std::thread t1(&mainPC::ImageProducer, std::ref(image_cons_prod)); // pass by reference
@@ -12,5 +11,6 @@ int main()
 
     t1.join();
     t2.join();
+
     return 0;
 }

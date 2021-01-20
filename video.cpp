@@ -1,434 +1,133 @@
-#include <tchar.h>
 #include <iostream>
 #include <opencv2/core/core.hpp>
-#include <opencv2\imgproc\imgproc.hpp>
-#include <opencv2\opencv.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/opencv.hpp>
 #include "video.h"
-//using namespace cv;
+
 using namespace std;
 
-//ÇëÓÃ»§ÌáÇ°ÅäÖÃºÃ¹¤³ÌÍ·ÎÄ¼şÄ¿Â¼,ĞèÒª°üº¬GalaxyIncludes.h
-#include"GalaxyIncludes.h"
+volatile unsigned int prdIdx;
+volatile unsigned int csmIdx;
 
-#include "video.h"
+BYTE* video::m_pBufferRaw;
+BYTE* video::m_pBufferRGB;
+int64_t video::m_nImageHeight;
+int64_t video::m_nImageWidth;
+int64_t video::m_nPayLoadSize;
+int64_t video::m_nPixelColorFilter;
+cv::Mat video::img;
 
-volatile unsigned int prdIdx[2];
-volatile unsigned int csmIdx[2];
-struct Imagedata {//Õâ¸öÊı¾İ½á¹¹¿ÉÒÔ¿¼ÂÇ»»³É¶ÓÁĞ
-	cv::Mat img, img2;
-	int status = 0;
+
+struct Imagedata {//è¿™ä¸ªæ•°æ®ç»“æ„å¯ä»¥è€ƒè™‘æ¢æˆé˜Ÿåˆ—
+	cv::Mat img;
 	unsigned int frame;
-	unsigned int payloadsize = 0;
-	unsigned int width = 0;
-	unsigned int height = 0;
-	unsigned int pixelformat = 0;
-	unsigned int frameid = 0;
-	unsigned long long int timestamp = 0;
 }datadata[2];
 
 video::video()
 {
-#ifndef Release
-	try {
-#endif
-		IGXFactory::GetInstance().Init();
-#ifndef Release
-	}
-	catch (CGalaxyException& e) {
-		cout << "´íÎóÂë: " << e.GetErrorCode() << endl;
-		cout << "´íÎóÃèÊöĞÅÏ¢: " << e.what() << endl;
-	}
-#endif
+    status = GXInitLib();
+    if (status != GX_STATUS_SUCCESS) {
+        return;
+    }
 }
 
 video::~video()
 {
-#ifndef Release
-	//¹Ø±ÕÉè±¸Ö®ºó£¬²»ÄÜÔÙµ÷ÓÃÆäËûÈÎºÎ¿â½Ó¿Ú
-	try {
-#endif
-		IGXFactory::GetInstance().Uninit();
-#ifndef Release
-	}
-	catch (CGalaxyException& e) {
-		cout << "´íÎóÂë: " << e.GetErrorCode() << endl;
-		cout << "´íÎóÃèÊöĞÅÏ¢: " << e.what() << endl;
-	}
-#endif
-	if (NULL != pCaptureEventHandler) {//Ïú»ÙÊÂ¼ş»Øµ÷Ö¸Õë
-		delete pCaptureEventHandler;
-		pCaptureEventHandler = NULL;
-	}
+    status = GXCloseDevice(hDevice);
+    status = GXCloseLib();
 }
-
-void video::initParam(int n)
+void video::initParam()
 {
-	bool bBalanceWhiteAutoRead = false;													//°×Æ½ºâÊÇ·ñ¿É¶Á
-	m_objFeatureControlPtr[n]->GetEnumFeature("AcquisitionMode")->SetValue("Continuous");	//ÉèÖÃ²É¼¯Ä£Ê½ÎªÁ¬Ğø²É¼¯Ä£Ê½
-	m_bTriggerMode[n] = m_objFeatureControlPtr[n]->IsImplemented("TriggerMode");				//ÊÇ·ñÖ§³Ö´¥·¢Ä£Ê½Ñ¡Ôñ
-	if (m_bTriggerMode[n]) {
-		m_objFeatureControlPtr[n]->GetEnumFeature("TriggerMode")->SetValue("Off");			//ÉèÖÃ´¥·¢Ä£Ê½¹Ø
-	}
-
-	m_bColorFilter[n] = m_objFeatureControlPtr[n]->IsImplemented("PixelColorFilter");			//ÊÇ·ñÖ§³ÖBayer¸ñÊ½
-	m_bTriggerSource[n] = m_objFeatureControlPtr[n]->IsImplemented("TriggerSource");			//ÊÇ·ñÖ§³Ö´¥·¢Ô´Ñ¡Ôñ
-	m_bTriggerActive[n] = m_objFeatureControlPtr[n]->IsImplemented("TriggerActivation");		//ÊÇ·ñÖ§³Ö´¥·¢¼«ĞÔÑ¡Ôñ
-	m_bBalanceWhiteAuto[n] = m_objFeatureControlPtr[n]->IsImplemented("BalanceWhiteAuto");	//ÊÇ·ñÖ§³Ö×Ô¶¯°×Æ½ºâ
-	bBalanceWhiteAutoRead = m_objFeatureControlPtr[n]->IsReadable("BalanceWhiteAuto");		//°×Æ½ºâÊÇ·ñ¿É¶Á
-
-
-	if (m_bBalanceWhiteAuto) {//Èç¹ûÖ§³ÖÇÒ¿É¶Á£¬Ôò»ñÈ¡Éè±¸µ±Ç°°×Æ½ºâÄ£Ê½
-		if (bBalanceWhiteAutoRead) {
-			m_strBalanceWhiteAutoMode[n] = m_objFeatureControlPtr[n]->GetEnumFeature("BalanceWhiteAuto")->GetValue();
-		}
-	}
-
-	m_bBalanceWhiteRatioSelect[n] = m_objFeatureControlPtr[n]->IsImplemented("BalanceRatioSelector");//ÊÇ·ñÖ§³Ö×Ô¶¯°×Æ½ºâÍ¨µÀÑ¡Ôñ
-
-	//»ñÈ¡ÆØ¹âÊ±¼ä¡¢ÔöÒæ¡¢×Ô¶¯°×Æ½ºâÏµÊı¼°Í¼Ïñ¿í¸ßµÄ×î´óÖµºÍ×îĞ¡Öµ
-	m_dShutterValueMax[n] = m_objFeatureControlPtr[n]->GetFloatFeature("ExposureTime")->GetMax();
-	m_dShutterValueMin[n] = m_objFeatureControlPtr[n]->GetFloatFeature("ExposureTime")->GetMin();
-	m_dGainValueMax[n] = m_objFeatureControlPtr[n]->GetFloatFeature("Gain")->GetMax();
-	m_dGainValueMin[n] = m_objFeatureControlPtr[n]->GetFloatFeature("Gain")->GetMin();
-	m_dBalanceWhiteRatioMax[n] = m_objFeatureControlPtr[n]->GetFloatFeature("BalanceRatio")->GetMax();
-	m_dBalanceWhiteRatioMin[n] = m_objFeatureControlPtr[n]->GetFloatFeature("BalanceRatio")->GetMin();
-	m_nWidthMax[n] = m_objFeatureControlPtr[n]->GetIntFeature("WidthMax")->GetValue();
-	m_nHeightMax[n] = m_objFeatureControlPtr[n]->GetIntFeature("HeightMax")->GetValue();
-#ifndef Release
-	cout << "m_dShutterValueMax:" << m_dShutterValueMax[n] << endl
-		<< "m_dShutterValueMin:" << m_dShutterValueMin[n] << endl
-		<< "m_dGainValueMax:" << m_dGainValueMax[n] << endl
-		<< "m_dGainValueMin:" << m_dGainValueMin[n] << endl
-		<< "m_dBalanceWhiteRatioMax:" << m_dBalanceWhiteRatioMax[n] << endl
-		<< "m_dBalanceWhiteRatioMin:" << m_dBalanceWhiteRatioMin[n] << endl
-		<< "m_nWidthMax:" << m_nWidthMax[n] << endl
-		<< "m_nHeightMax:" << m_nHeightMax[n] << endl;
-#endif // !DEBUG
 
 }
 
-int video::videoCheck() {//ËÑË÷Ïà»ú
-	IGXFactory::GetInstance().UpdateDeviceList(1000, vectorDeviceInfo);
-	//ÅĞ¶ÏÃ¶¾Ùµ½µÄÉè±¸ÊÇ·ñ´óÓÚÁã£¬Èç¹û²»ÊÇÔòµ¯¿òÌáÊ¾
-	deviceNum = vectorDeviceInfo.size();
-	cout << deviceNum << endl;
-	return deviceNum <= 0 ? 0 : deviceNum;
+int video::videoCheck() {//æœç´¢ç›¸æœº
+
+    status = GX_STATUS_SUCCESS;
+    status = GXUpdateDeviceList(&nDeviceNum, 1000);
+	return nDeviceNum <= 0 ? 0 : nDeviceNum;
 }
-bool video::videoOpen(int n) {//³õÊ¼»¯Ïà»ú
+bool video::videoOpen() {//åˆå§‹åŒ–ç›¸æœº
 
-	bool bIsDeviceOpen = false;       ///< Éè±¸ÊÇ·ñÒÑ´ò¿ª±êÖ¾
-	bool bIsStreamOpen = false;       ///< Éè±¸Á÷ÊÇ·ñÒÑ´ò¿ª±êÖ¾
-	bool m_bSupportExposureEndEvent = false;       ///< ÊÇ·ñÖ§³ÖÆØ¹â½áÊø±êÖ¾
-#ifndef Release
-	try {
-#endif
-		cerr << vectorDeviceInfo[n].GetSN() << endl;
-		m_objDevicePtr[n] = IGXFactory::GetInstance().OpenDeviceBySN(vectorDeviceInfo[n].GetSN(), GX_ACCESS_EXCLUSIVE);//´ò¿ªÉè±¸
-		bIsDeviceOpen = true;
-		m_objFeatureControlPtr[n] = m_objDevicePtr[n]->GetRemoteFeatureControl();//»ñÈ¡ÊôĞÔ¿ØÖÆÆ÷¶ÔÏó 
-		uint32_t nStreamCount = m_objDevicePtr[n]->GetStreamCount();//»ñÈ¡Á÷Í¨µÀ¸öÊı
-
-		if (nStreamCount > 0) {//´ò¿ªÁ÷
-			m_objStreamPtr[n] = m_objDevicePtr[n]->OpenStream(0);
-			m_objStreamFeatureControlPtr[n] = m_objStreamPtr[n]->GetFeatureControl();
-			bIsStreamOpen = true;
-		}
-		else {
-#ifndef Release
-			throw exception("Î´·¢ÏÖÉè±¸Á÷!");
-#else
-			return false;
-#endif
-		}
-		//³õÊ¼»¯Ïà»ú²ÎÊı
-		initParam(n);
-		m_bIsOpen[n] = true;
-#ifndef Release
-	}
-	catch (CGalaxyException& e) {
-
-		if (bIsStreamOpen) {//ÅĞ¶ÏÉè±¸Á÷ÊÇ·ñÒÑ´ò¿ª
-			m_objStreamPtr[n]->Close();
-		}
-		if (bIsDeviceOpen) {//ÅĞ¶ÏÉè±¸ÊÇ·ñÒÑ´ò¿ª
-			m_objDevicePtr[n]->Close();
-			return false;
-		}
-	}
-	catch (std::exception& e) {
-
-		if (bIsStreamOpen) {//ÅĞ¶ÏÉè±¸Á÷ÊÇ·ñÒÑ´ò¿ª
-			m_objStreamPtr[n]->Close();
-		}
-		if (bIsDeviceOpen) {//ÅĞ¶ÏÉè±¸ÊÇ·ñÒÑ´ò¿ª
-			m_objDevicePtr[n]->Close();
-		}
-		return false;
-	}
-#endif
-	return true;
+    stOpenParam.accessMode = GX_ACCESS_EXCLUSIVE;
+    stOpenParam.openMode = GX_OPEN_INDEX;
+    stOpenParam.pszContent = "1";
+    status = GXOpenDevice(&stOpenParam, &hDevice);
+    return true;
+    //åˆå§‹åŒ–ç›¸æœºå‚æ•°
+    //initParam();
 }
 
-bool video::videoStart(int n) {//´´½¨Á÷¶ÔÏó
-	pCaptureEventHandler = new CSampleCaptureEventHandler(n);
-	m_objStreamPtr[n]->RegisterCaptureCallback(pCaptureEventHandler, NULL);
-	m_objStreamPtr[n]->StartGrab();//·¢ËÍ¿ª²ÉÃüÁî
-	m_objFeatureControlPtr[n]->GetCommandFeature("AcquisitionStart")->Execute();
-	return true;
+bool video::streamControl(int n) {
+
+    if(n == 1){
+
+        // è·å–å›¾åƒå¤§å°
+        status = GXGetInt(hDevice, GX_INT_PAYLOAD_SIZE, &m_nPayLoadSize);
+        // è·å–å®½åº¦
+        status = GXGetInt(hDevice, GX_INT_WIDTH, &m_nImageWidth);
+        // è·å–é«˜åº¦
+        status = GXGetInt(hDevice, GX_INT_HEIGHT, &m_nImageHeight);
+        img.create(m_nImageHeight, m_nImageWidth, CV_8UC3);
+        //åˆ¤æ–­ç›¸æœºæ˜¯å¦æ”¯æŒbayeræ ¼å¼
+        bool m_bColorFilter;
+        status = GXIsImplemented(hDevice, GX_ENUM_PIXEL_COLOR_FILTER, &m_bColorFilter);
+        if (m_bColorFilter) {
+            status = GXGetEnum(hDevice, GX_ENUM_PIXEL_COLOR_FILTER, &m_nPixelColorFilter);
+        }
+
+        m_pBufferRGB = new BYTE[(size_t)(m_nImageWidth * m_nImageHeight * 3)];
+        if (m_pBufferRGB == NULL) {
+            return false;
+        }
+        //ä¸ºå­˜å‚¨åŸå§‹å›¾åƒæ•°æ®ç”³è¯·ç©ºé—´
+        m_pBufferRaw = new BYTE[(size_t)m_nPayLoadSize];
+        if (m_pBufferRaw == NULL) {
+            delete[]m_pBufferRGB;
+            m_pBufferRGB = NULL;
+            return false;
+        }
+
+        //æ³¨å†Œå›¾åƒå¤„ç†å›è°ƒå‡½æ•°
+        status = GXRegisterCaptureCallback(hDevice, NULL,OnFrameCallbackFun);
+        status = GXSendCommand(hDevice, GX_COMMAND_ACQUISITION_START);
+    }
+    else{
+        status = GXSendCommand(hDevice, GX_COMMAND_ACQUISITION_STOP);
+        status = GXUnregisterCaptureCallback(hDevice);
+    }
+    return true;
 }
 
-bool video::getFrame(cv::Mat& img,int n) {//»ñÈ¡Ò»Ö¡Í¼Æ¬
-	int framenum;
-	while (0 == prdIdx[n-1] - csmIdx[n - 1]);
-	datadata[csmIdx[n - 1] % 1].img.copyTo(img);
-	printf("%d %llu  %llu  %llu\n", n, datadata[csmIdx[n - 1] % 1].frame,
-		datadata[csmIdx[n - 1] % 1].frameid, datadata[csmIdx[n - 1] % 1].timestamp);
-	framenum = datadata[csmIdx[n - 1] % 1].frame;
-	++(csmIdx[n - 1]);
-	if (datadata[csmIdx[n - 1] % 1].status==-1 || img.empty() || img.channels() != 3 ) {
+bool video::getFrame(cv::Mat& img) {//è·å–ä¸€å¸§å›¾ç‰‡
+	while (0 == prdIdx - csmIdx);
+	datadata[csmIdx % 1].img.copyTo(img);
+	++csmIdx;
+	cout<<"csmIdx"<<csmIdx<<endl;
+	if (img.empty() || img.channels() != 3 ) {
 		return false;
 	}
 	return true;
 }
 
-bool video::videoStopStream(int n) {//¶Ï¿ªÀ­Á÷
-	m_objFeatureControlPtr[n]->GetCommandFeature("AcquisitionStop")->Execute();
-	m_objStreamPtr[n]->StopGrab();//·¢ËÍÍ£²ÉÃüÁî
-	m_objStreamPtr[n]->UnregisterCaptureCallback();//×¢Ïú²É¼¯»Øµ÷
-	return true;
-}
-void video::videoClose(int n) {//¶Ï¿ªÏà»ú
-	//×¢ÏúÔ¶¶ËÉè±¸ÊÂ¼ş
-	m_objFeatureControlPtr[n]->UnregisterFeatureCallback(NULL);
-	//×¢ÏúÉè±¸µôÏßÊÂ¼ş
-	//ObjDevicePtr->UnregisterDeviceOfflineCallback(hDeviceOffline);
-
-	//ÊÍ·Å×ÊÔ´
-	m_objStreamPtr[n]->Close();
-	m_objDevicePtr[n]->Close();
-}
-
-bool video::setTrigMode(int mode,int n)
+void GX_STDC video::OnFrameCallbackFun(GX_FRAME_CALLBACK_PARAM* pFrame)
 {
-#ifndef Release
-	try {
-#endif
-		m_bTriggerMode[n] = m_objFeatureControlPtr[n]->IsImplemented("TriggerMode");//ÊÇ·ñÖ§³Ö´¥·¢Ä£Ê½Ñ¡Ôñ
-		if (m_bTriggerMode[n]) {
-			m_objFeatureControlPtr[n]->GetEnumFeature("TriggerMode")->SetValue("Off");//ÉèÖÃ´¥·¢Ä£Ê½¹Ø
-		}
-		else {
-			//m_objFeatureControlPtr[n]->GetEnumFeature("TriggerSelector")->SetValue("FrameStart");
-			if (1 == mode) {
-				m_objFeatureControlPtr[n]->GetEnumFeature("TriggerMode")->SetValue("On");
-				m_objFeatureControlPtr[n]->GetEnumFeature("TriggerSource")->SetValue("Software");
-			}
-			else {
-				m_objFeatureControlPtr[n]->GetEnumFeature("TriggerMode")->SetValue("Off");
-			}
-		}
-		return true;
-#ifndef Release
-	}
-	catch (CGalaxyException& e) {
-		cerr << e.what() << endl;
-		return false;
-	}
-	catch (std::exception& e) {
-		cerr << e.what() << endl;
-		return false;
-	}
-#endif
-	return false;
-}
+    //while (prdIdx - csmIdx >= 1);
+    memcpy(m_pBufferRaw, pFrame->pImgBuf, pFrame->nImgSize);
+    // RGBè½¬æ¢
+    DxRaw8toRGB24(m_pBufferRaw
+            , m_pBufferRGB
+            , (VxUint32)(m_nImageWidth)
+            , (VxUint32)(m_nImageHeight)
+            , RAW2RGB_NEIGHBOUR
+            , DX_PIXEL_COLOR_FILTER(m_nPixelColorFilter)
+            , false);
+    memcpy(img.data, m_pBufferRGB, m_nImageWidth*m_nImageHeight * 3);
+    namedWindow("img");
+    imshow("img", img);
+    waitKey(15);
 
-void video::executeSoftTrig() {
-#ifndef Release
-	try {//·¢ËÍÈí´¥·¢ÃüÁî(ÔÚ´¥·¢Ä£Ê½¿ªÆôÊ±ÓĞĞ§)
-#endif
-		for(int i=0;i<deviceNum;++i)
-			m_objFeatureControlPtr[i]->GetCommandFeature("TriggerSoftware")->Execute();
-#ifndef Release
-	}
-	catch (CGalaxyException& e) {
-		cout << e.what() << endl;
-		return;
-	}
-	catch (std::exception& e) {
-		cout << e.what() << endl;
-		return;
-	}
-#endif
-}
-
-void video::SetExposeTime(double m_dEditShutterValue,int n) {//ÉèÖÃÆØ¹â
-	m_objFeatureControlPtr[n]->GetFloatFeature("ExposureTime")->SetValue(m_dEditShutterValue);
-	if (!m_bIsOpen) {
-		return;
-	}
-	double dShutterValueOld = m_dEditShutterValue;
-#ifndef Release
-	try {//ÅĞ¶ÏÊäÈëÖµÊÇ·ñÔÚÆØ¹âÊ±¼ä·¶Î§ÄÚ£¬Èç¹û²»ÊÇÔòÉèÖÃÓëÆä×î½üµÄ±ß½çÖµ
-#endif
-		if (m_dEditShutterValue > m_dShutterValueMax[n]) {
-			m_dEditShutterValue = m_dShutterValueMax[n];
-		}
-		if (m_dEditShutterValue < m_dShutterValueMin[n]) {
-			m_dEditShutterValue = m_dShutterValueMin[n];
-		}
-		m_objFeatureControlPtr[n]->GetFloatFeature("ExposureTime")->SetValue(m_dEditShutterValue);
-#ifndef Release
-	}
-	catch (CGalaxyException & e)
-	{
-		m_dEditShutterValue = dShutterValueOld;
-		cerr << e.what() << endl;
-	}
-	catch (std::exception & e)
-	{
-		m_dEditShutterValue = dShutterValueOld;
-		cerr << e.what() << endl;
-	}
-#endif
-}							
-void video::SetAdjustPlus(double m_dEditGainValue,int n) {//ÉèÖÃÔöÒæ
-	if (!m_bIsOpen){
-		return;
-	}
-	double dGainValueOld = m_dEditGainValue;
-#ifndef Release
-	try{
-#endif
-		if (m_dEditGainValue == -1) {
-			m_objFeatureControlPtr[n]->GetEnumFeature("GainAuto")->SetValue("Continuous");
-		}
-		else {
-			m_objFeatureControlPtr[n]->GetEnumFeature("GainAuto")->SetValue("Off");
-			//ÅĞ¶ÏÊäÈëÖµÊÇ·ñÔÚÔöÒæÖµ·¶Î§ÄÚ£¬Èç¹û²»ÊÇÔòÉèÖÃÓëÆä×î½üµÄ±ß½çÖµ
-			if (m_dEditGainValue > m_dGainValueMax[n]) {
-				m_dEditGainValue = m_dGainValueMax[n];
-			}
-			if (m_dEditGainValue < m_dGainValueMin[n]) {
-				m_dEditGainValue = m_dGainValueMin[n];
-			}
-			m_objFeatureControlPtr[n]->GetFloatFeature("Gain")->SetValue(m_dEditGainValue);
-		}
-#ifndef Release
-	}
-	catch (CGalaxyException & e){
-		m_dEditGainValue = dGainValueOld;
-	}
-	catch (std::exception & e){
-		m_dEditGainValue = dGainValueOld;
-	}
-#endif
-}
-void video::setBalanceRatio(double m_dEditBalanceRatioValue,int n) {
-	if (!m_bIsOpen[n]){
-		return;
-	}
-	double dBalanceWhiteRatioOld = m_dEditBalanceRatioValue;
-#ifndef Release
-	try{
-#endif
-		if (m_dEditBalanceRatioValue == -1) { //×Ô¶¯°×Æ½ºâ
-			m_objFeatureControlPtr[n]->GetEnumFeature("BalanceWhiteAuto")->SetValue("Continuous");
-		}
-		else {
-			m_objFeatureControlPtr[n]->GetEnumFeature("BalanceWhiteAuto")->SetValue("Off");
-			//ÅĞ¶ÏÊäÈëÖµÊÇ·ñÔÚ×Ô¶¯°×Æ½ºâÏµÊı·¶Î§ÄÚ£¬Èç¹û²»ÊÇÔòÉèÖÃÓëÆä×î½üµÄ±ß½çÖµ
-			if (m_dEditBalanceRatioValue > m_dBalanceWhiteRatioMax[n]) {
-				m_dEditBalanceRatioValue = m_dBalanceWhiteRatioMax[n];
-			}
-			if ((m_dEditBalanceRatioValue < m_dBalanceWhiteRatioMin[n])) {
-				m_dEditBalanceRatioValue = m_dBalanceWhiteRatioMin[n];
-			}
-			m_objFeatureControlPtr[n]->GetFloatFeature("BalanceRatio")->SetValue(m_dEditBalanceRatioValue);
-		}
-#ifndef Release
-	}
-	catch (CGalaxyException & e){
-		m_dEditBalanceRatioValue = dBalanceWhiteRatioOld;
-		cout << e.what() << endl;
-	}
-	catch (std::exception & e){
-		m_dEditBalanceRatioValue = dBalanceWhiteRatioOld;
-		cout << e.what() << endl;
-	}
-#endif
-}
-void video::setROI(int64_t nX, int64_t nY, int64_t nWidth, int64_t nHeight, int n){
-	if (!m_bIsOpen[n]) {
-		return;
-	}
-#ifndef Release
-	try {
-#endif
-		if (nWidth > m_nWidthMax[n]) { nWidth = m_nWidthMax[n]; }
-		if (nHeight > m_nHeightMax[n]) { nHeight = m_nHeightMax[n]; }
-		if (nWidth + nX > m_nWidthMax[n]) { //Æ«ÒÆÁ¿³¬³ö×î´óÖµ
-			nX = m_nWidthMax[n] - nWidth;
-			nX = nX - nX % 16;
-		}
-		if (nHeight + nY > m_nHeightMax[n]) {
-			nY = m_nHeightMax[n] - nHeight;
-			nY = nY - nY % 16;
-		}
-		m_objFeatureControlPtr[n]->GetIntFeature("OffsetX")->SetValue(nX);
-		m_objFeatureControlPtr[n]->GetIntFeature("OffsetY")->SetValue(nY);
-		m_objFeatureControlPtr[n]->GetIntFeature("Width")->SetValue(nWidth);
-		m_objFeatureControlPtr[n]->GetIntFeature("Height")->SetValue(nHeight);
-#ifndef Release
-	}
-	catch (CGalaxyException& e) {
-		cout << e.what() << endl;
-	}
-	catch (std::exception& e) {
-		cout << e.what() << endl;
-	}
-#endif
-}
-
-void video::setFrameRate(double rate, int n) {
-	if (!m_bIsOpen[n]) {
-		return;
-	}
-#ifndef Release
-	try {
-#endif
-		m_objFeatureControlPtr[n]->GetFloatFeature("AcquisitionFrameRate")->SetValue(rate);
-#ifndef Release
-	}
-	catch (CGalaxyException& e) {
-		cout << e.what() << endl;
-	}
-	catch (std::exception& e) {
-		cout << e.what() << endl;
-	}
-#endif
-}		
-
-CSampleCaptureEventHandler::CSampleCaptureEventHandler(int n1) {
-	n = n1;
-}
-
-void CSampleCaptureEventHandler::DoOnImageCaptured(CImageDataPointer& objImageDataPointer, void* pUserParam) {
-	while (prdIdx[n - 1] - csmIdx[n - 1] >= 1);
-	void* pRGB24Buffer = NULL;
-	pRGB24Buffer = objImageDataPointer->ConvertToRGB24(GX_BIT_0_7, GX_RAW2RGB_NEIGHBOUR, true);
-	Mat test;
-	test.create(objImageDataPointer->GetHeight(), objImageDataPointer->GetWidth(), CV_8UC3);
-	memcpy(test.data, pRGB24Buffer, objImageDataPointer->GetPayloadSize() * 3);
-	flip(test, test, 0);
-	datadata[prdIdx[n - 1] % 1].img = test;
-	datadata[prdIdx[n - 1] % 1].frame++;
-	datadata[prdIdx[n - 1] % 1].status = objImageDataPointer->GetStatus();
-	/*datadata[prdIdx[n-1] % 1].payloadsize = objImageDataPointer->GetPayloadSize();
-	datadata[prdIdx[n-1] % 1].width = objImageDataPointer->GetWidth();
-	datadata[prdIdx[n-1] % 1].height = objImageDataPointer->GetHeight();
-	datadata[prdIdx[n-1] % 1].pixelformat = objImageDataPointer->GetPixelFormat();*/
-	datadata[prdIdx[n - 1] % 1].frameid = objImageDataPointer->GetFrameID();
-	datadata[prdIdx[n - 1] % 1].timestamp = objImageDataPointer->GetTimeStamp();
-
-	++(prdIdx[n - 1]);
+    datadata[prdIdx % 1].img = img;
+    datadata[prdIdx % 1].frame++;
+    ++prdIdx;
 }

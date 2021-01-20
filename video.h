@@ -1,94 +1,47 @@
 #pragma once
 
-#include "GalaxyIncludes.h"
-#include "GXBitmap.h"
+#include "GxIAPI.h"
+#include "DxImageProc.h"
 
 #include <opencv2/highgui.hpp>
-#include <opencv2/core/core.hpp>  
-#include <opencv2/imgproc/imgproc.hpp>  
+#include <opencv2/core/core.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 #include <iostream>
-#include <vector>  
+#include <vector>
 #include <cstdio>
 
-using namespace std;
-using cv::Mat;
-using cv::namedWindow;
-using cv::imshow;
-using cv::waitKey;
+#define BYTE unsigned char
 
 using namespace std;
-//ÓÃ»§¼Ì³ĞµôÏßÊÂ¼ş´¦ÀíÀà
+using namespace cv;
 
-class CSampleCaptureEventHandler : public ICaptureEventHandler
-{
-public:
-    CSampleCaptureEventHandler(int n1);
-    void DoOnImageCaptured(CImageDataPointer& objImageDataPointer, void* pUserParam);
-private:
-    int n;
-};
-class video
-{
+static void GX_STDC OnFrameCallbackFun(GX_FRAME_CALLBACK_PARAM* pFrame);
+
+class video {
 public:
     video();
     ~video();
 
-    void initParam(int n=0);                                            //³õÊ¼»¯²ÎÊıDone
-    int videoCheck();										            //ËÑË÷Ïà»úDone
-    bool videoOpen(int n=0);										    //³õÊ¼»¯Ïà»úDone
-    bool videoStart(int n=0);										    //´´½¨Á÷¶ÔÏóDone
-    bool getFrame(Mat& img,int n=0);                                    //»ñÈ¡Ò»Ö¡Í¼Æ¬Done
-    bool videoStopStream(int n=0);									    //¶Ï¿ªÀ­Á÷Done
-    void videoClose(int n=0);										    //¶Ï¿ªÏà»úDone
-    bool setTrigMode(int mode = 0,int n=0);                             //ON:mode=1 OFF:mode=0 Done
-
-    void executeSoftTrig();									            //Ö´ĞĞÒ»´ÎÈí´¥·¢Done       
-    void SetExposeTime(double m_dEditShutterValue,int n=0);				//ÉèÖÃÆØ¹âDone
-    void SetAdjustPlus(double m_dEditGainValue,int n=0);				//ÉèÖÃÔöÒæDone
-    void setBalanceRatio(double m_dEditBalanceRatioValue,int n=0);      //°×Æ½ºâDone
-    void setROI(int64_t nX, int64_t nY, int64_t nWidth, int64_t nHeight,int n=0);
-                                                                        //ÉèÖÃROI(ÇøÓòÊä³ö)DONE
-
-    void setFrameRate(double rate = 210,int n=0);					    //ÉèÖÃÖ¡ÂÊDone
-    int  deviceNum = 0;                                                 //Ïà»ú¸öÊı
+    void initParam();
+    int videoCheck();
+    bool videoOpen();
+    bool getFrame(Mat& img);
+    bool streamControl(int n=1);
 
 private:
-    bool bIsDeviceOpen = false;         // Éè±¸ÊÇ·ñ´ò¿ª±êÖ¾
-    bool bIsStreamOpen = false;         // Éè±¸Á÷ÊÇ·ñ´ò¿ª±êÖ¾
+    GX_STATUS status = GX_STATUS_SUCCESS;
+    GX_DEV_HANDLE hDevice = NULL;
+    GX_OPEN_PARAM stOpenParam;
+    uint32_t nDeviceNum = 0;
 
-    GxIAPICPP::gxdeviceinfo_vector vectorDeviceInfo;                    //Ïà»úÁĞ±í
-    
-    ICaptureEventHandler* pCaptureEventHandler ;                        //²É¼¯»Øµ÷¶ÔÏó
+    static BYTE         *m_pBufferRaw;          ///< åŸå§‹å›¾åƒæ•°æ®
+    static BYTE         *m_pBufferRGB;          ///< RGBå›¾åƒæ•°æ®ï¼Œç”¨äºæ˜¾ç¤ºå’Œä¿å­˜bmpå›¾åƒ
+    static int64_t      m_nImageHeight;         ///< åŸå§‹å›¾åƒé«˜
+    static int64_t      m_nImageWidth;          ///< åŸå§‹å›¾åƒå®½
+    static int64_t      m_nPayLoadSize;
+    static int64_t      m_nPixelColorFilter;    ///< Bayeræ ¼å¼
+    static Mat img;
 
-    CGXDevicePointer                  m_objDevicePtr[2];                // Éè±¸¾ä±ú
-    CGXStreamPointer                  m_objStreamPtr[2];                // Éè±¸Á÷
-    CGXFeatureControlPointer          m_objFeatureControlPtr[2];        // ÊôĞÔ¿ØÖÆÆ÷
-    CGXFeatureControlPointer          m_objStreamFeatureControlPtr[2];  // Á÷²ã¿ØÖÆÆ÷¶ÔÏó
-
-    bool                              m_bIsTrigValid;                   // SJR:Ã»ÓÃÉÏ£¬Ó¦¸ÃµÃÓĞÒ»¸ö·ÀÖ¹Á¬ĞøÈí´¥·¢µÄ·½·¨¡£
-                                                                        //´¥·¢ÊÇ·ñÓĞĞ§±êÖ¾:µ±Ò»´Î´¥·¢ÕıÔÚÖ´ĞĞÊ±£¬½«¸Ã±êÖ¾ÖÃÎªfalse
-
-    bool                              m_bIsOpen[2];                  // Éè±¸´ò¿ª±êÊ¶
-    bool                              m_bIsSnap[2];                  // Éè±¸²É¼¯±êÊ¶
-    bool                              m_bColorFilter[2];             // ÊÇ·ñÖ§³Ö²ÊÉ«Ïà»ú
-    bool                              m_bTriggerMode[2];             // ÊÇ·ñÖ§³Ö´¥·¢Ä£Ê½
-    bool                              m_bTriggerSource[2];           // ÊÇ·ñÖ§³Ö´¥·¢Ô´
-    bool                              m_bTriggerActive[2];           // ÊÇ·ñÖ§³Ö´¥·¢¼«ĞÔ
-    bool                              m_bBalanceWhiteAuto[2];        // ÊÇ·ñÖ§³Ö×Ô¶¯°×Æ½ºâ
-    bool                              m_bBalanceWhiteRatioSelect[2]; // ÊÇ·ñÖ§³Ö°×Æ½ºâÍ¨µÀÑ¡Ôñ
-    double                            m_dShutterValueMax[2];         // ÆØ¹âÊ±¼ä×î´óÖµ      
-    double                            m_dShutterValueMin[2];         // ÆØ¹âÊ±¼ä×îĞ¡Öµ     
-    double                            m_dGainValueMax[2];            // ÔöÒæ×î´óÖµ
-    double                            m_dGainValueMin[2];            // ÔöÒæ×îĞ¡Öµ
-    double                            m_dBalanceWhiteRatioMax[2];    // ×Ô¶¯°×Æ½ºâÏµÊı×î´óÖµ
-    double                            m_dBalanceWhiteRatioMin[2];    // ×Ô¶¯°×Æ½ºâÏµÊı×îĞ¡Öµ
-    int                               m_nWidthMax[2];                // Í¼Ïñ¿í¶È×î´óÖµ
-    int                               m_nHeightMax[2];               // Í¼Ïñ¸ß¶È×î´óÖµ
-    int                               m_nTriggerModeOld[2];          // ¼ÇÂ¼´¥·¢Ä£Ê½
-    int                               m_nTriggerSourceOld[2];        // ¼ÇÂ¼´¥·¢Ô´
-    int                               m_nTriggerActiveOld[2];        // ¼ÇÂ¼´¥·¢¼«ĞÔ
-    int                               m_nBalanceWhiteAutoOld[2];     // ¼ÇÂ¼×Ô¶¯°×Æ½ºâ
-    int                               m_nBanlanceWhiteRatioOld[2];   // ¼ÇÂ¼×Ô¶¯°×Æ½ºâÏµÊı
-    gxstring                          m_strBalanceWhiteAutoMode[2];  // ¼ÇÂ¼×Ô¶¯°×Æ½ºâ·½Ê½ 
+    static void GX_STDC OnFrameCallbackFun(GX_FRAME_CALLBACK_PARAM* pFrame);
 };
